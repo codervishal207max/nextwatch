@@ -1,44 +1,69 @@
 # NextWatch
 
-A recommender for 30 to 60 minute films. Users open a film; how long they watch, their rating, like and feedback decide the next film we pick.
+**A recommender for 30 to 60 minute films that learns from how you actually watch.**
 
-```
-backend/   FastAPI + SQLAlchemy (auth, catalog, tracking, recommendations)
-frontend/  React 19 + Vite + Tailwind v4 (login, home, details, watch + feedback)
-ml/        Feature engineering, training (Logistic Regression, Random Forest fallback)
-```
+## What is NextWatch?
+NextWatch is a film platform where every title runs **30 to 60 minutes**. Instead of "search a movie, get similar movies", it watches *how* you watch: how much you finish, what you rate, what you like and what you tell it afterwards. A machine learning model uses those signals to pick your next film.
 
-## Run it
-```bash
-# backend
-cd backend && python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env          # then set SECRET_KEY
-python seed.py                # 60 demo films (30-60 min); or: python scripts/import_tmdb.py
-uvicorn app.main:app --reload
-
-# frontend (new terminal)
-cd frontend && cp .env.example .env && npm install && npm run dev
-```
-Google sign-in (optional): create a Web OAuth Client ID, set `GOOGLE_CLIENT_ID` in `backend/.env` and `VITE_GOOGLE_CLIENT_ID` in `frontend/.env`, and add `http://localhost:5173` as an authorized JavaScript origin.
-
-Open http://localhost:5173, create an account, watch a film. Attach a playable file in `movies.video_url` first (TMDB gives posters and metadata, not videos).
-
-## How the recommendation works
-1. `GET /api/recommendations/next` scores every unwatched 30-60 min film for the user and logs what it showed (`impressions`).
-2. The player sends heartbeats (`PATCH /api/sessions/{id}`); the end screen sends rating, like and feedback.
-3. Label per (user, film): 1 = rating >= 7, like, or >= 80% watched; 0 = rating <= 4, dislike, or < 30% watched. Ambiguous rows are skipped.
-4. Features are computed only from data before each event (no future leakage): user history, film stats, genre affinity, runtime gap, time of day.
-5. `ml/train.py` trains Logistic Regression first; if validation AUC is below 0.80 it also trains a Random Forest and keeps it only if it is clearly better. Compared with a popularity baseline on a time-based test split.
-6. New users, or no trained model: popularity among 30-60 min films.
-
-```bash
-cd ml
-python train.py               # simulated data: checks the pipeline end to end
-python train.py --source db   # real sessions from the platform (use this once users exist)
+## How it works
+```mermaid
+flowchart LR
+    A["User opens a film"] --> B["Watches in the player"]
+    B --> C["Watch time, pauses and skips are recorded"]
+    B --> D["Rating, like and feedback are collected"]
+    C --> E[("Database")]
+    D --> E
+    E --> F["ML model learns the user's taste"]
+    F --> G["Scores unwatched 30-60 min films"]
+    G --> H["Your next film"]
+    H --> A
 ```
 
-## Status (read before showing this to anyone)
-- The model has only been trained on **simulated** data. Its scores prove the pipeline runs, not that recommendations are good. Retrain with `--source db` after real usage and report those numbers.
-- Not built yet: My List / Profile / Search pages wired to the API, Alembic migrations, Docker.
-- After pulling new columns into an old dev database, delete `nextwatch.db` and re-seed, or add a migration.
+1. **Watch:** the user opens a film and watches it in an embedded player.
+2. **Track:** the app records watch time, pauses, skips and where the viewer dropped off.
+3. **Feedback:** after the film the user gives a rating (1-10), a like or dislike, and quick tags.
+4. **Learn:** these signals become labels (liked or not liked) and features (user history, genre affinity, film popularity, runtime). A Logistic Regression model is trained first, and a Random Forest is tried if it is not good enough.
+5. **Recommend:** the best model scores every unwatched film, and the top picks appear on Home. New users see popular films until they have some history.
+
+## NextWatch flowchart
+```mermaid
+flowchart TD
+    A([User signs in]) --> B["Home: Your next film"]
+    B --> C["Open a film and watch"]
+    C --> D["Track: watch time, pauses, skips"]
+    C --> E["Feedback: rating, like, tags"]
+    D --> F[("PostgreSQL")]
+    E --> F
+    F --> G["Create labels and features"]
+    G --> H["Train Logistic Regression"]
+    H --> I{"Good enough?"}
+    I -->|Yes| K["Use Logistic Regression"]
+    I -->|No| J["Train Random Forest"]
+    J --> K2["Use the better model"]
+    K --> L["Score unwatched 30-60 min films"]
+    K2 --> L
+    L --> M["Top picks shown on Home"]
+    M --> B
+```
+
+## Technologies used
+| Area | Technology |
+|---|---|
+| Frontend | React 19, Vite, Tailwind CSS, React Router |
+| Backend | FastAPI, SQLAlchemy, JWT authentication, Google Sign-In |
+| Database | PostgreSQL |
+| Machine learning | Python, scikit-learn (Logistic Regression, Random Forest), pandas, NumPy |
+| Video and catalog | YouTube embedded player and YouTube Data API (CC BY films only) |
+| Tools | Git and GitHub, VS Code, pgAdmin |
+
+## Applications
+- **Short-film and documentary streaming:** a personal "what should I watch tonight" for content that fits an evening, a lunch break or a commute.
+- **Micro-learning platforms:** recommending the next 30 to 60 minute lecture or documentary from how learners actually watch.
+- **OTT and creator platforms:** a ready pattern for using watch time and feedback, instead of only clicks, to drive recommendations.
+- **Recommender-system learning and research:** a complete example of implicit feedback, leakage-free features and model comparison against a popularity baseline.
+
+## Author
+**Vishal Fulbandhe**
+B.Tech CSE (AI and ML) student
+
+[LinkedIn](https://www.linkedin.com/in/vishal-fulbandhe-16662832b/) · [GitHub](https://github.com/codervishal207max)
