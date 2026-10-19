@@ -1,4 +1,5 @@
 """Pick the next 30-60 minute films for a user: trained model if available, popularity otherwise."""
+import logging
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import engine
 from app.models import Movie, User, WatchSession
+
+log = logging.getLogger(__name__)
 
 ML_DIR = Path(__file__).resolve().parents[3] / "ml"
 MODEL_PATH = ML_DIR / "artifacts" / "model.joblib"
@@ -41,7 +44,7 @@ def _model_scores(bundle, user_id: int, cands: List[Movie]) -> Optional[dict]:
     feats = build_features(pd.concat([inter, rows], ignore_index=True), movies)
     feats = feats[(feats["user_id"] == user_id) & (feats["ts"] == now)]
     proba = bundle["model"].predict_proba(feats[bundle["features"]])[:, 1]
-    return dict(zip(feats["movie_id"], proba))
+    return {int(mid): float(p) for mid, p in zip(feats["movie_id"], proba)}
 
 
 def recommend(db: Session, user: User, k: int = 5) -> Tuple[str, List[Tuple[Movie, Optional[float]]]]:
@@ -49,10 +52,20 @@ def recommend(db: Session, user: User, k: int = 5) -> Tuple[str, List[Tuple[Movi
     cands = db.query(Movie).filter(Movie.runtime_minutes.between(MIN_RUNTIME, MAX_RUNTIME), Movie.id.notin_(seen)).all()
     if not cands:
         return "none", []
+
     bundle = _bundle()
-    scores = _model_scores(bundle, user.id, cands) if bundle else None
+    scores = None
+    if bundle:
+        try:
+            scores = _model_scores(bundle, user.id, cands)
+        except Exception:
+            # a scoring problem must never break Home: log it and fall back to popularity
+            log.exception("Model scoring failed, falling back to popularity")
+
     if scores:
-        ranked = sorted(cands, key=lambda m: -scores[m.id])[:k]
-        return f"model:{bundle['name']}", [(m, float(scores[m.id])) for m in ranked]
+        scored = [m for m in cands if m.id in scores]
+        ranked = sorted(scored, key=lambda m: -scores[m.id])[:k]
+        return f"model:{bundle['name']}", [(m, scores[m.id]) for m in ranked]
+
     ranked = sorted(cands, key=lambda m: -(m.popularity or 0))[:k]
     return "popularity", [(m, None) for m in ranked]
