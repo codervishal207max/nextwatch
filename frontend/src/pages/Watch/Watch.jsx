@@ -6,10 +6,24 @@ import { movieAPI, trackingAPI } from "../../services/api";
 const TAGS = ["great_ending", "loved_the_acting", "too_slow", "too_long", "not_my_genre", "want_more_like_this"];
 const label = (t) => t.replace(/_/g, " ");
 
+function loadYouTube() {
+  return new Promise((resolve) => {
+    if (window.YT?.Player) return resolve(window.YT);
+    const previous = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { previous?.(); resolve(window.YT); };
+    if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+      const s = document.createElement("script");
+      s.src = "https://www.youtube.com/iframe_api";
+      document.head.appendChild(s);
+    }
+  });
+}
+
 function Watch() {
   const { id } = useParams();
   const navigate = useNavigate();
   const video = useRef(null);
+  const ytBox = useRef(null);
   const session = useRef({ id: null, starting: false, watched: 0, furthest: 0, pauses: 0, seeks: 0, last: 0 });
 
   const [movie, setMovie] = useState(null);
@@ -20,6 +34,8 @@ function Watch() {
   const [reaction, setReaction] = useState(0);
   const [tags, setTags] = useState([]);
   const [comment, setComment] = useState("");
+
+  const ytId = movie?.video_url?.startsWith("youtube:") ? movie.video_url.slice(8) : null;
 
   useEffect(() => {
     movieAPI.getById(id).then((r) => setMovie(r.data)).catch(() => setError("Could not load this film."));
@@ -34,9 +50,9 @@ function Watch() {
     }).catch(() => {});
   };
 
-  // heartbeat every 15 s while mounted, final update when the viewer leaves
+  // heartbeat every 15 s while the viewer is here, final update when they leave
   useEffect(() => {
-    const timer = setInterval(() => { if (video.current && !video.current.paused) send(false); }, 15000);
+    const timer = setInterval(() => { if (session.current.playing) send(false); }, 15000);
     const hidden = () => document.hidden && send(false);
     document.addEventListener("visibilitychange", hidden);
     return () => { clearInterval(timer); document.removeEventListener("visibilitychange", hidden); send(true); };
@@ -44,6 +60,7 @@ function Watch() {
 
   const onPlay = async () => {
     const s = session.current;
+    s.playing = true;
     if (s.id || s.starting) return;
     s.starting = true;
     try {
@@ -52,12 +69,49 @@ function Watch() {
     } catch { setError("Could not start tracking this session."); }
   };
 
-  const onTimeUpdate = () => {
-    const s = session.current, t = video.current.currentTime, delta = t - s.last;
-    if (!video.current.paused && delta > 0 && delta < 2) s.watched += delta; // skips don't count as watching
+  // time accounting, shared by both players: skips don't count as watching
+  const track = (t) => {
+    const s = session.current, delta = t - s.last;
+    if (delta > 0 && delta < 2.5) s.watched += delta;
     s.furthest = Math.max(s.furthest, t);
     s.last = t;
   };
+
+  // HTML5 <video> events
+  const onTimeUpdate = () => { if (!video.current.paused) track(video.current.currentTime); else session.current.last = video.current.currentTime; };
+
+  // YouTube player
+  useEffect(() => {
+    if (!ytId) return undefined;
+    let player, timer, cancelled = false;
+    const box = ytBox.current;
+    loadYouTube().then((YT) => {
+      if (cancelled || !box) return;
+      const target = document.createElement("div");
+      box.appendChild(target);
+      player = new YT.Player(target, {
+        videoId: ytId, width: "100%", height: "100%", playerVars: { rel: 0, playsinline: 1 },
+        events: {
+          onStateChange: (e) => {
+            const s = session.current;
+            clearInterval(timer);
+            if (e.data === YT.PlayerState.PLAYING) {
+              const t = player.getCurrentTime();
+              if (Math.abs(t - s.last) > 2.5) s.seeks += 1;
+              s.last = t;
+              onPlay();
+              timer = setInterval(() => track(player.getCurrentTime()), 1000);
+            } else if (e.data === YT.PlayerState.PAUSED) {
+              s.playing = false; s.pauses += 1; track(player.getCurrentTime()); send(false);
+            } else if (e.data === YT.PlayerState.ENDED) {
+              s.playing = false; track(player.getCurrentTime()); send(true); setFinished(true);
+            }
+          },
+        },
+      });
+    });
+    return () => { cancelled = true; clearInterval(timer); player?.destroy?.(); if (box) box.innerHTML = ""; };
+  }, [ytId]);
 
   const submit = async () => {
     const calls = [];
@@ -77,27 +131,34 @@ function Watch() {
         <ArrowLeft size={18} /> Back
       </button>
       <h1 className="mb-1 text-3xl font-bold">{movie.title}</h1>
-      <p className="mb-5 text-sm text-gray-400">{movie.runtime_minutes} min</p>
+      <p className="mb-5 text-sm text-gray-400">{movie.runtime_minutes} min{movie.genres ? ` · ${movie.genres}` : ""}</p>
 
-      {movie.video_url ? (
+      {ytId ? (
+        <div ref={ytBox} className="aspect-video w-full overflow-hidden rounded-xl bg-black" />
+      ) : movie.video_url ? (
         <video
           ref={video} src={movie.video_url} controls className="w-full rounded-xl bg-black"
-          onPlay={onPlay} onTimeUpdate={onTimeUpdate}
-          onPause={() => { if (!video.current.ended) { session.current.pauses += 1; send(false); } }}
+          onPlay={() => { session.current.last = video.current.currentTime; onPlay(); }}
+          onTimeUpdate={onTimeUpdate}
+          onPause={() => { if (!video.current.ended) { session.current.playing = false; session.current.pauses += 1; send(false); } }}
           onSeeking={() => { session.current.seeks += 1; }}
           onSeeked={() => { session.current.last = video.current.currentTime; }}
-          onEnded={() => { send(true); setFinished(true); }}
+          onEnded={() => { session.current.playing = false; send(true); setFinished(true); }}
         />
       ) : (
         <div className="flex aspect-video items-center justify-center rounded-xl bg-slate-900 text-center text-slate-400">
-          No video is attached to this film yet. Set movies.video_url to a playable file.
+          No video is attached to this film yet.
         </div>
       )}
 
+      {movie.overview && <p className="mt-4 whitespace-pre-line text-sm text-slate-400">{movie.overview}</p>}
+      {ytId && (
+        <a href={`https://www.youtube.com/watch?v=${ytId}`} target="_blank" rel="noopener noreferrer"
+          className="mt-2 inline-block text-sm text-cyan-400 hover:underline">View on YouTube</a>
+      )}
+
       {!finished && (
-        <button onClick={() => setFinished(true)} className="mt-4 text-sm text-slate-400 hover:text-white">
-          Give feedback now
-        </button>
+        <div><button onClick={() => setFinished(true)} className="mt-4 text-sm text-slate-400 hover:text-white">Give feedback now</button></div>
       )}
 
       {finished && (
@@ -105,9 +166,7 @@ function Watch() {
           {sent ? (
             <div>
               <p className="mb-4 text-lg font-semibold">Thanks. Your next film is ready.</p>
-              <button onClick={() => navigate("/")} className="rounded-lg bg-cyan-400 px-5 py-2 font-bold text-slate-950 hover:bg-cyan-300">
-                See what's next
-              </button>
+              <button onClick={() => navigate("/")} className="rounded-lg bg-cyan-400 px-5 py-2 font-bold text-slate-950 hover:bg-cyan-300">See what's next</button>
             </div>
           ) : (
             <>
@@ -126,9 +185,7 @@ function Watch() {
               <div className="mb-5 flex flex-wrap gap-2">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
                   <button key={n} aria-pressed={rating === n} onClick={() => setRating(n)}
-                    className={`h-9 w-9 rounded-lg border text-sm ${rating === n ? "border-cyan-400 bg-cyan-400 text-slate-950" : "border-slate-700"}`}>
-                    {n}
-                  </button>
+                    className={`h-9 w-9 rounded-lg border text-sm ${rating === n ? "border-cyan-400 bg-cyan-400 text-slate-950" : "border-slate-700"}`}>{n}</button>
                 ))}
               </div>
               <p className="mb-2 text-sm text-slate-400">What stood out?</p>
@@ -136,9 +193,7 @@ function Watch() {
                 {TAGS.map((t) => (
                   <button key={t} aria-pressed={tags.includes(t)}
                     onClick={() => setTags((cur) => (cur.includes(t) ? cur.filter((x) => x !== t) : [...cur, t]))}
-                    className={`rounded-full border px-3 py-1 text-sm ${tags.includes(t) ? "border-cyan-400 bg-cyan-400/15" : "border-slate-700 text-slate-300"}`}>
-                    {label(t)}
-                  </button>
+                    className={`rounded-full border px-3 py-1 text-sm ${tags.includes(t) ? "border-cyan-400 bg-cyan-400/15" : "border-slate-700 text-slate-300"}`}>{label(t)}</button>
                 ))}
               </div>
               <textarea value={comment} onChange={(e) => setComment(e.target.value)} maxLength={1000} rows={3}

@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Heart } from "lucide-react";
+import useWatchlist from "../../hooks/useWatchlist";
 
 function MovieCard({ movie }) {
-  const [saved, setSaved] = useState(false);
   const [broken, setBroken] = useState(false);
+  const { ids, toggle } = useWatchlist();
+  const saved = ids.has(movie.id);
   const navigate = useNavigate();
   const open = () => navigate(`/movie/${movie.id}`);
 
@@ -26,8 +28,9 @@ function MovieCard({ movie }) {
         )}
         <button
           className={saved ? "saved" : ""}
-          onClick={(e) => { e.stopPropagation(); setSaved((v) => !v); }}
-          aria-label={`Save ${movie.title}`}
+          onClick={(e) => { e.stopPropagation(); toggle(movie.id); }}
+          aria-label={saved ? `Remove ${movie.title} from My List` : `Add ${movie.title} to My List`}
+          aria-pressed={saved}
         >
           <Heart size={15} fill={saved ? "currentColor" : "none"} />
         </button>
@@ -38,7 +41,7 @@ function MovieCard({ movie }) {
       {/* Match % only appears when it is a real model score */}
       {movie.match != null
         ? <p className="match-score">{movie.match}% match</p>
-        : <p className="match-score">{movie.runtime ? `${movie.runtime} min` : `★ ${movie.rating ?? "–"}`}</p>}
+        : <p className="match-score">{movie.runtime ? `${movie.runtime} min` : `★ ${movie.rating ?? "-"}`}</p>}
       <h3>{movie.title}</h3>
       <small>{movie.genres?.[0]}</small>
     </article>

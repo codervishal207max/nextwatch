@@ -31,6 +31,8 @@ export const movieAPI = {
   getByGenre:        (genre) => API.get(`/api/movies/?genre=${genre}`),
   getById:           (id) => API.get(`/api/movies/${id}`),
   search:            (q) => API.get(`/api/movies/search?q=${q}`),
+  list:              (params) => API.get("/api/movies/", { params }),
+  getGenres:         () => API.get("/api/movies/genres"),
 };
 
 export const recommendAPI = {
@@ -52,15 +54,17 @@ export const watchlistAPI = {
   remove: (movieId) => API.delete(`/api/watchlist/${movieId}`),
 };
 
-export const userAPI = {
-  getMe: () => API.get("/api/users/me"),
-};
 
 export const adminAPI = {
   overview:        () => API.get("/api/admin/overview"),
   users:           (params) => API.get("/api/admin/users", { params }),
   user:            (id) => API.get(`/api/admin/users/${id}`),
   recommendations: () => API.get("/api/admin/recommendations"),
+};
+
+export const userAPI = {
+  getMe:    () => API.get("/api/users/me"),
+  getStats: () => API.get("/api/users/me/stats"),
 };
 
 export default API;

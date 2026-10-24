@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Play } from "lucide-react";
 
-// `movies` come from the backend (top picks), already shaped by Home.jsx
+const clamp = (lines) => ({ display: "-webkit-box", WebkitLineClamp: lines, WebkitBoxOrient: "vertical", overflow: "hidden" });
+
+// `movies` come from the backend (top picks), already shaped by toCard()
 function HeroBanner({ movies = [] }) {
   const [active, setActive] = useState(0);
   const navigate = useNavigate();
@@ -25,8 +27,8 @@ function HeroBanner({ movies = [] }) {
         <div className="featured-copy">
           {movie.poster && <img src={movie.poster} alt={`${movie.title} poster`} className="featured-poster" />}
           <div className="featured-description">
-            <h1>{movie.title}</h1>
-            <p>{movie.overview}</p>
+            <h1 style={clamp(2)}>{movie.title}</h1>
+            <p style={clamp(3)}>{movie.overview}</p>
             <small>{[movie.genres?.join(" / "), movie.year, movie.runtime && `${movie.runtime} min`].filter(Boolean).join("  |  ")}</small>
             <div className="featured-buttons">
               <button className="play-button" onClick={() => navigate(`/watch/${movie.id}`)}>
