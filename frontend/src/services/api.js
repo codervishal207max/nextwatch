@@ -46,6 +46,7 @@ export const trackingAPI = {
   rate:     (movieId, rating) => API.put(`/api/movies/${movieId}/rating`, { rating }),
   react:    (movieId, value)  => API.put(`/api/movies/${movieId}/reaction`, { value }),
   feedback: (movieId, body)   => API.post(`/api/movies/${movieId}/feedback`, body),
+  myFeedback: (movieId) => API.get(`/api/movies/${movieId}/my-feedback`),
 };
 
 export const watchlistAPI = {
@@ -60,6 +61,8 @@ export const adminAPI = {
   users:           (params) => API.get("/api/admin/users", { params }),
   user:            (id) => API.get(`/api/admin/users/${id}`),
   recommendations: () => API.get("/api/admin/recommendations"),
+  daily:    () => API.get("/api/admin/daily"),
+  activity: (limit = 50) => API.get("/api/admin/activity", { params: { limit } }),
 };
 
 export const userAPI = {

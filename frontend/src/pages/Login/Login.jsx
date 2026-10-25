@@ -121,10 +121,31 @@ export default function AuthPage({ initialMode = "login" }) {
   const [formError, setFormError] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [waking, setWaking] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
 
   const isRegister = mode === "register";
   const score = passwordScore(form.password);
   const googleBtn = useRef(null);
+
+  // Free hosting sleeps when idle. Wake the backend while the user is still typing.
+  useEffect(() => {
+    axios.get(`${BASE_URL}/health`, { timeout: 70000 }).catch(() => {});
+  }, []);
+
+  // POST that patiently retries while the server is waking up (no response, 502, 503 or 504).
+  async function postWithRetry(url, body) {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await axios.post(url, body, { timeout: 70000 });
+      } catch (err) {
+        const transient = !err.response || [502, 503, 504].includes(err.response.status);
+        if (!transient || attempt >= 2) throw err;
+        setWaking(true);
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+      }
+    }
+  }
 
   // Google renders its own official button; we receive an ID token and trade it for our JWT.
   useEffect(() => {
@@ -175,13 +196,13 @@ export default function AuthPage({ initialMode = "login" }) {
     try {
       const email = form.email.trim();
       if (isRegister) {
-        await axios.post(`${BASE_URL}/api/auth/register`, {
+        await postWithRetry(`${BASE_URL}/api/auth/register`, {
           name: form.name.trim(),
           email,
           password: form.password,
         });
       }
-      const res = await axios.post(`${BASE_URL}/api/auth/login`, { email, password: form.password });
+      const res = await postWithRetry(`${BASE_URL}/api/auth/login`, { email, password: form.password });
       localStorage.setItem("nw_token", res.data.access_token);
       localStorage.setItem("nw_auth", "true");
       navigate("/");
@@ -189,18 +210,23 @@ export default function AuthPage({ initialMode = "login" }) {
       setFormError(readError(err));
     } finally {
       setLoading(false);
+      setWaking(false);
     }
   }
 
   async function handleGoogle(response) {
     setFormError("");
+    setGoogleBusy(true);
     try {
-      const res = await axios.post(`${BASE_URL}/api/auth/google`, { credential: response.credential });
+      const res = await postWithRetry(`${BASE_URL}/api/auth/google`, { credential: response.credential });
       localStorage.setItem("nw_token", res.data.access_token);
       localStorage.setItem("nw_auth", "true");
       navigate("/");
     } catch (err) {
       setFormError(readError(err));
+    } finally {
+      setGoogleBusy(false);
+      setWaking(false);
     }
   }
 
@@ -322,7 +348,15 @@ export default function AuthPage({ initialMode = "login" }) {
               </p>
             )}
 
-            <button type="submit" disabled={loading}
+            {(loading || googleBusy) && (
+              <p role="status" className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-2.5 text-sm text-cyan-200">
+                {waking
+                  ? "Waking up the server (free hosting). The first request can take up to a minute."
+                  : googleBusy ? "Signing you in with Google..." : "Please wait..."}
+              </p>
+            )}
+
+            <button type="submit" disabled={loading || googleBusy}
               className="w-full rounded-lg bg-cyan-400 py-3 text-sm font-bold text-slate-950 outline-none transition-colors hover:bg-cyan-300 focus-visible:ring-2 focus-visible:ring-cyan-200 disabled:cursor-not-allowed disabled:opacity-60">
               {loading ? (isRegister ? "Creating account..." : "Logging in...") : isRegister ? "Create account" : "Log in"}
             </button>

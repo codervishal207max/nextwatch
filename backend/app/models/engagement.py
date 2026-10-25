@@ -91,3 +91,13 @@ class Feedback(Base):
     tags: Mapped[Optional[str]] = mapped_column(String(200))  # e.g. "too_slow,great_ending,not_my_genre"
     comment: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+class LoginEvent(Base):
+    """One row per successful login, so the admin can count logins per day."""
+
+    __tablename__ = "login_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    method: Mapped[str] = mapped_column(String(20), default="password", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True, nullable=False)

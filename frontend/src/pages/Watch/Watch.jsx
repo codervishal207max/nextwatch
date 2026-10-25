@@ -41,6 +41,20 @@ function Watch() {
     movieAPI.getById(id).then((r) => setMovie(r.data)).catch(() => setError("Could not load this film."));
   }, [id]);
 
+  // show what this user already did for this film (rating and like), so the buttons stay filled
+  useEffect(() => {
+    trackingAPI.myFeedback(id).then((r) => {
+      if (r.data.rating) setRating(r.data.rating);
+      if (r.data.reaction) setReaction(r.data.reaction);
+    }).catch(() => {});
+  }, [id]);
+
+  // fill the button at once and save the like right away, even if the viewer skips "Send feedback"
+  const choose = (value) => {
+    setReaction(value);
+    trackingAPI.react(id, value).catch(() => {});
+  };
+
   const send = (ended = false) => {
     const s = session.current;
     if (!s.id) return;
@@ -172,13 +186,13 @@ function Watch() {
             <>
               <h2 className="mb-4 text-xl font-bold">How was it?</h2>
               <div className="mb-5 flex gap-3">
-                <button aria-pressed={reaction === 1} onClick={() => setReaction(reaction === 1 ? 0 : 1)}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 ${reaction === 1 ? "border-cyan-400 bg-cyan-400/15" : "border-slate-700"}`}>
-                  <ThumbsUp size={16} /> Like
+                <button aria-pressed={reaction === 1} onClick={() => choose(1)}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 font-semibold transition-colors ${reaction === 1 ? "border-cyan-400 bg-cyan-400 text-slate-950" : "border-slate-700 hover:border-slate-500"}`}>
+                  <ThumbsUp size={16} fill={reaction === 1 ? "currentColor" : "none"} /> {reaction === 1 ? "Liked" : "Like"}
                 </button>
-                <button aria-pressed={reaction === -1} onClick={() => setReaction(reaction === -1 ? 0 : -1)}
-                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 ${reaction === -1 ? "border-red-400 bg-red-400/15" : "border-slate-700"}`}>
-                  <ThumbsDown size={16} /> Dislike
+                <button aria-pressed={reaction === -1} onClick={() => choose(-1)}
+                  className={`flex items-center gap-2 rounded-lg border px-4 py-2 font-semibold transition-colors ${reaction === -1 ? "border-red-400 bg-red-400 text-slate-950" : "border-slate-700 hover:border-slate-500"}`}>
+                  <ThumbsDown size={16} fill={reaction === -1 ? "currentColor" : "none"} /> {reaction === -1 ? "Disliked" : "Dislike"}
                 </button>
               </div>
               <p className="mb-2 text-sm text-slate-400">Rating</p>

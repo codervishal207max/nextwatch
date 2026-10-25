@@ -6,6 +6,7 @@ from app.models.user import User
 from app.schemas.user import UserCreate
 from app.core.config import settings
 from app.core.security import hash_password, verify_password, create_access_token
+from app.models.engagement import LoginEvent
 
 def register_user(db: Session, data: UserCreate) -> User:
     existing = db.query(User).filter(User.email == data.email).first()
@@ -40,6 +41,14 @@ def login_user(db: Session, email: str, password: str) -> str:
 
     token = create_access_token(data={"sub": user.email})
     return token
+
+def record_login(db, user_id: int, method: str) -> None:
+    """Remember a login. It must never break the login itself."""
+    try:
+        db.add(LoginEvent(user_id=user_id, method=method))
+        db.commit()
+    except Exception:
+        db.rollback()
 
 
 def google_login(db: Session, credential: str) -> str:

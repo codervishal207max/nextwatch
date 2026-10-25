@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.database.connection import get_db
-from app.models import Feedback, Impression, Movie, Rating, Reaction, User, WatchSession
+from app.models import Feedback, Impression, LoginEvent, Movie, Rating, Reaction, User, WatchSession
 
 router = APIRouter(prefix="/api/admin", tags=["Admin"], dependencies=[Depends(require_admin)])
 
@@ -135,3 +135,34 @@ def recommendation_health(db: Session = Depends(get_db)):
     return [{"strategy": v or "unknown", "shown": shown, "started": started,
              "start_rate_pct": round(100 * started / shown) if shown else 0,
              "avg_completion_pct": round((_num(c) or 0) * 100) if started else None} for v, shown, started, c in rows]
+
+
+@router.get("/daily", summary="Logins and watching per day, last 14 days (UTC days)")
+def daily(db: Session = Depends(get_db)):
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(days=13)
+    login_day = func.date(LoginEvent.created_at)
+    logins = {str(d)[:10]: (n, u) for d, n, u in db.execute(
+        select(login_day, func.count(LoginEvent.id), func.count(func.distinct(LoginEvent.user_id)))
+        .where(LoginEvent.created_at >= since).group_by(login_day))}
+    watch_day = func.date(WatchSession.started_at)
+    watching = {str(d)[:10]: (n, u) for d, n, u in db.execute(
+        select(watch_day, func.count(WatchSession.id), func.count(func.distinct(WatchSession.user_id)))
+        .where(WatchSession.started_at >= since).group_by(watch_day))}
+    out = []
+    for i in range(13, -1, -1):
+        day = (now - timedelta(days=i)).date().isoformat()
+        lg, wt = logins.get(day, (0, 0)), watching.get(day, (0, 0))
+        out.append({"day": day, "logins": lg[0], "users_logged_in": lg[1], "films_started": wt[0], "users_watching": wt[1]})
+    return out
+
+
+@router.get("/activity", summary="Latest films watched, across all users")
+def activity(limit: int = Query(50, ge=1, le=200), db: Session = Depends(get_db)):
+    rows = db.execute(
+        select(WatchSession, User.name, User.email, Movie.title)
+        .join(User, User.id == WatchSession.user_id).join(Movie, Movie.id == WatchSession.movie_id)
+        .order_by(WatchSession.started_at.desc()).limit(limit)).all()
+    return [{"user": name, "email": email, "movie": title, "started_at": _iso(s.started_at),
+             "watched_minutes": round(s.watched_seconds / 60), "runtime_minutes": round(s.runtime_seconds / 60),
+             "completion_pct": round(s.completion_ratio * 100)} for s, name, email, title in rows]

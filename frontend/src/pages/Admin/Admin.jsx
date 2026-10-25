@@ -77,6 +77,8 @@ function UserPanel({ id, onClose }) {
 export default function Admin() {
   const [overview, setOverview] = useState(null);
   const [strategies, setStrategies] = useState([]);
+  const [daily, setDaily] = useState([]);
+  const [activity, setActivity] = useState([]);
   const [users, setUsers] = useState({ total: 0, users: [] });
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("last_active");
@@ -85,8 +87,8 @@ export default function Admin() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    Promise.all([adminAPI.overview(), adminAPI.recommendations()])
-      .then(([o, r]) => { setOverview(o.data); setStrategies(r.data); })
+    Promise.all([adminAPI.overview(), adminAPI.recommendations(), adminAPI.daily(), adminAPI.activity(50)])
+      .then(([o, r, d, a]) => { setOverview(o.data); setStrategies(r.data); setDaily(d.data); setActivity(a.data); })
       .catch((e) => (e.response?.status === 403 ? setForbidden(true) : setError("Could not load admin data.")));
   }, []);
 
@@ -138,6 +140,33 @@ export default function Admin() {
           </div>
         </>
       )}
+
+      <div className="mt-8 overflow-x-auto rounded-xl border border-slate-800">
+        <p className="border-b border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">Daily activity, last 14 days (UTC days)</p>
+        <table className="w-full text-left text-sm">
+          <thead className="text-slate-400"><tr><th className="px-4 py-2">Day</th><th>Logins</th><th>Users logged in</th><th>Films started</th><th>Users watching</th></tr></thead>
+          <tbody>{[...daily].reverse().map((d) => (
+            <tr key={d.day} className="border-t border-slate-800">
+              <td className="px-4 py-2">{d.day}</td><td>{d.logins}</td><td>{d.users_logged_in}</td><td>{d.films_started}</td><td>{d.users_watching}</td>
+            </tr>))}</tbody>
+        </table>
+      </div>
+
+      <div className="mt-6 overflow-x-auto rounded-xl border border-slate-800">
+        <p className="border-b border-slate-800 bg-slate-900 px-4 py-3 text-sm text-slate-400">Recent activity: who watched what</p>
+        <table className="w-full text-left text-sm">
+          <thead className="text-slate-400"><tr><th className="px-4 py-2">User</th><th>Film</th><th>Watched</th><th>Completion</th><th>When</th></tr></thead>
+          <tbody>
+            {activity.map((a, i) => (
+              <tr key={i} className="border-t border-slate-800">
+                <td className="px-4 py-2"><p className="font-medium">{a.user}</p><p className="text-xs text-slate-500">{a.email}</p></td>
+                <td>{a.movie}</td><td>{a.watched_minutes} of {a.runtime_minutes} min</td><td>{a.completion_pct}%</td>
+                <td className="text-slate-400">{when(a.started_at)}</td>
+              </tr>))}
+            {!activity.length && <tr><td className="px-4 py-3 text-slate-500" colSpan="5">No films watched yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
 
       <div className="mb-3 mt-8 flex flex-wrap items-center gap-3">
         <h2 className="mr-auto text-xl font-bold">Users ({users.total})</h2>

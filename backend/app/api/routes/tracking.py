@@ -83,3 +83,10 @@ def send_feedback(movie_id: int, data: FeedbackIn, db: Session = Depends(get_db)
                     tags=",".join(t.strip() for t in data.tags if t.strip())[:200] or None, comment=data.comment))
     db.commit()
     return {"message": "Thanks for the feedback."}
+
+
+@router.get("/movies/{movie_id}/my-feedback", summary="This user's own rating and like for a film")
+def my_feedback(movie_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    rating = db.query(Rating).filter_by(user_id=user.id, movie_id=movie_id).first()
+    reaction = db.query(Reaction).filter_by(user_id=user.id, movie_id=movie_id).first()
+    return {"rating": rating.rating if rating else None, "reaction": reaction.value if reaction else 0}
