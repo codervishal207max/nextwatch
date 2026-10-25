@@ -12,6 +12,7 @@ import MyList from "./pages/MyList/MyList";
 import Profile from "./pages/Profile/Profile";
 import Settings from "./pages/Settings/Settings";
 import Watch from "./pages/Watch/Watch";
+import Search from "./pages/Search/Search";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route path="/watch/:id" element={<Watch />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/search" element={<Search />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

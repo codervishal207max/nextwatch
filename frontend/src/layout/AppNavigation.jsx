@@ -1,3 +1,4 @@
+import SearchBar from "../components/common/Searchbar";
 import { useEffect, useState } from "react";
 import { userAPI } from "../services/api";
 import { logout } from "../utils/auth";
@@ -35,7 +36,7 @@ function AppNavigation() {
         {navigation.map(({ label, path }) => <NavLink key={path} to={path} end={path === "/"} onClick={() => setMenuOpen(false)}>{label}</NavLink>)}
       </nav>
       <div className="header-actions">
-        <form className="header-search" onSubmit={submitSearch}><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search" aria-label="Search movies" /></form>
+        <form className="header-search" onSubmit={submitSearch}><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} SearchBar="Search" aria-label="Search movies" /></form>
         <div className="notification-wrap"><button className="icon-button" onClick={() => setNoticeOpen((open) => !open)} aria-label="Notifications"><Bell size={20} /><i /></button>{noticeOpen && <div className="notification-popover"><b>Notifications</b><p>New movies are waiting for you.</p></div>}</div>
         <Link to="/profile" className="profile-chip"><span className="avatar">{initials}</span><span className="profile-name">{user?.name || "Profile"}</span><ChevronDown size={15} /></Link>
         <button className="icon-button" onClick={() => logout(navigate)} aria-label="Log out" title="Log out"><LogOut size={20} /></button>
