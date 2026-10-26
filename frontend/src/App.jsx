@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
+
 import ProtectedRoute from "./components/common/ProtectedRoute";
 import MainLayout from "./layout/MainLayout";
 import Admin from "./pages/Admin/Admin";
@@ -13,6 +14,7 @@ import Profile from "./pages/Profile/Profile";
 import Settings from "./pages/Settings/Settings";
 import Watch from "./pages/Watch/Watch";
 import Search from "./pages/Search/Search";
+import PublicRoute from "./components/common/PublicRoute";
 
 function App() {
   return (
@@ -32,6 +34,9 @@ function App() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/login" element={<PublicRoute><Login initialMode="login" /></PublicRoute>} />
+          <Route path="/register" element={<PublicRoute><Login initialMode="register" /></PublicRoute>} />   
+
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -13,3 +13,14 @@
 @media (max-width: 1100px) { .dashboard-header { gap:16px; padding:12px 20px; }.top-navigation { gap:20px; padding:0 15px; }.header-search { width:150px; }.featured-copy { padding-right:35%; }.movie-shelves { gap:3px 20px; padding:0 22px 30px; }.featured-section { padding:20px 22px 14px; }.movie-card { flex-basis:105px; }.movie-poster { height:144px; } }
 @media (max-width: 800px) { .dashboard-header { height:66px; }.brand { font-size:20px; }.brand-mark { font-size:27px; }.mobile-menu { display:block; margin-left:auto; color:white; border:0; background:none; }.top-navigation { position:absolute; display:none; flex-direction:column; align-items:stretch; top:66px; left:12px; right:12px; height:auto; padding:8px; background:#1a2030; box-shadow:0 15px 30px #0008; }.top-navigation.is-open { display:flex; }.top-navigation a { padding:12px; }.top-navigation a.active:after { display:none; }.header-actions { margin-left:0; }.header-search { width:120px; }.profile-name, .profile-chip svg { display:none; }.side-navigation { display:none; }.app-content { margin-left:0; min-height:calc(100vh - 66px); }.featured-section { padding:14px; }.featured-copy { padding:17px 28px; }.featured-poster { width:112px; height:162px; }.featured-description h1 { white-space:normal; }.movie-shelves { grid-template-columns:1fr; padding:0 14px 25px; } }
 @media (max-width: 520px) { .header-search { width:37px; padding:8px; }.header-search input { display:none; }.featured-art { inset:0; opacity:.28; }.featured-copy { min-height:290px; padding:25px; align-items:flex-end; }.featured-poster { display:none; }.featured-description { min-width:0; }.featured-description p { max-width:350px; }.hero-arrow { display:none; }.movie-card { flex-basis:108px; }.movie-poster { height:148px; }.icon-button { padding:5px; }.profile-chip { gap:4px; }.avatar { width:31px; height:31px; } }
+
+/* Search and Settings inside the phone menu (the sidebar is hidden on phones) */
+.top-navigation .mobile-only { display: none; }
+.menu-search { align-items: center; gap: 8px; margin: 6px 4px; padding: 11px 12px; border: 1px solid #622c42; border-radius: 10px; color: #d94760; background: #351526a8; }
+.menu-search input { width: 100%; border: 0; outline: 0; color: white; background: transparent; font-size: 15px; }
+.menu-search input::placeholder { color: #a4919a; }
+.menu-logout { padding: 12px; text-align: left; color: #e1e4eb; border: 0; background: transparent; font: inherit; }
+@media (max-width: 800px) {
+  .header-search { display: none; }
+  .top-navigation .mobile-only { display: flex; }
+}

@@ -205,7 +205,7 @@ export default function AuthPage({ initialMode = "login" }) {
       const res = await postWithRetry(`${BASE_URL}/api/auth/login`, { email, password: form.password });
       localStorage.setItem("nw_token", res.data.access_token);
       localStorage.setItem("nw_auth", "true");
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err) {
       setFormError(readError(err));
     } finally {
@@ -221,7 +221,7 @@ export default function AuthPage({ initialMode = "login" }) {
       const res = await postWithRetry(`${BASE_URL}/api/auth/google`, { credential: response.credential });
       localStorage.setItem("nw_token", res.data.access_token);
       localStorage.setItem("nw_auth", "true");
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err) {
       setFormError(readError(err));
     } finally {
@@ -237,6 +237,12 @@ export default function AuthPage({ initialMode = "login" }) {
 
   return (
     <div className="grid min-h-screen bg-[#0b0f17] text-white lg:grid-cols-[1.05fr_1fr]">
+      {googleBusy && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-[#0b0f17]/95 text-white" role="status">
+          <span className="h-10 w-10 animate-spin rounded-full border-4 border-slate-700 border-t-cyan-400" />
+          <p className="text-lg font-semibold">{waking ? "Waking up the server, almost there..." : "Signing you in..."}</p>
+        </div>
+      )}
       <ProductPanel />
 
       <main className="flex items-center justify-center px-6 py-12">

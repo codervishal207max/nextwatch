@@ -39,6 +39,6 @@ def root() -> Dict[str, str]:
     return {"message": "NextWatch API is running"}
 
 
-@app.get("/health", tags=["System"])
+@app.api_route("/health", methods=["GET", "HEAD"], tags=["System"])
 def health() -> Dict[str, str]:
     return {"status": "ok"}
